@@ -5,107 +5,162 @@ on:
     branches: [ master, main ]
     tags:
       - 'v*'
-  # 关键修改：增加手动触发时的输入参数
+  # 关键：接收后端传来的参数
   workflow_dispatch:
     inputs:
       build_windows:
-        description: '是否执行 Windows 打包 (true/false)'
+        description: '是否打包 Windows (true/false)'
         default: 'false'
-        required: true
       build_android:
-        description: '是否执行 Android 打包 (true/false)'
+        description: '是否打包 Android (true/false)'
         default: 'false'
-        required: true
       build_ios:
-        description: '是否执行 iOS 打包 (true/false)'
+        description: '是否打包 iOS (true/false)'
         default: 'false'
+      project_json:
+        description: 'Base64 编码的剧情 JSON'
+        required: true
+      build_id:
+        description: '后端生成的唯一构建 ID'
         required: true
 
 jobs:
-  # --- Build Windows ---
+  # --- Windows 编译任务 ---
   build-windows:
-    # 逻辑：如果是推送到 tag 或者手动指定 build_windows 为 true
-    if: |
-      startsWith(github.ref, 'refs/tags/v') || 
-      github.event.inputs.build_windows == 'true'
+    if: github.event.inputs.build_windows == 'true' || startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           cache: true
+
+      # 注入动态 JSON：将后端传来的 Base64 还原并写入 main.dart
+      - name: Inject JSON Data
+        shell: bash
+        run: |
+          echo "${{ github.event.inputs.project_json }}" | base64 --decode > lib/data.json
+          python3 -c "
+          import re
+          json_text = open('lib/data.json', 'r', encoding='utf-8').read()
+          with open('lib/main.dart', 'r', encoding='utf-8') as f:
+              content = f.read()
+          # 替换代码中的 rawJson 变量内容
+          pattern = r\"const String rawJson = '''[\s\S]*?''';\"
+          replacement = f\"const String rawJson = '''\\n{json_text}\\n''';\"
+          new_content = re.sub(pattern, replacement, content)
+          with open('lib/main.dart', 'w', encoding='utf-8') as f:
+              f.write(new_content)
+          "
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Build Windows
         run: flutter build windows --release
-      - name: Prepare & Upload Artifact
-        run: |
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath flutter_player-windows.zip
-      - name: Upload
+
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: flutter_player-windows
-          path: flutter_player-windows.zip
+          # 这里的 Name 必须和 Node.js 轮询时匹配
+          name: flutter-app-windows-${{ github.event.inputs.build_id }}
+          path: build/windows/x64/runner/Release/
+          retention-days: 7
 
-  # --- Build Android ---
+  # --- Android 编译任务 ---
   build-android:
-    if: |
-      startsWith(github.ref, 'refs/tags/v') || 
-      github.event.inputs.build_android == 'true'
+    if: github.event.inputs.build_android == 'true' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup Java & Android
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           cache: true
+
+      - name: Inject JSON Data
+        run: |
+          echo "${{ github.event.inputs.project_json }}" | base64 --decode > lib/data.json
+          python3 -c "
+          import re
+          json_text = open('lib/data.json', 'r', encoding='utf-8').read()
+          with open('lib/main.dart', 'r', encoding='utf-8') as f:
+              content = f.read()
+          pattern = r\"const String rawJson = '''[\s\S]*?''';\"
+          replacement = f\"const String rawJson = '''\\n{json_text}\\n''';\"
+          new_content = re.sub(pattern, replacement, content)
+          with open('lib/main.dart', 'w', encoding='utf-8') as f:
+              f.write(new_content)
+          "
+
       - name: Build APK
-        run: flutter build apk --release
-      - name: Upload
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: flutter_player-android
+          name: flutter-app-apk-${{ github.event.inputs.build_id }}
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
 
-  # --- Build iOS ---
+  # --- iOS 编译任务 ---
   build-ios:
-    if: |
-      startsWith(github.ref, 'refs/tags/v') || 
-      github.event.inputs.build_ios == 'true'
+    if: github.event.inputs.build_ios == 'true' || startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           cache: true
-      - name: Build iOS
-        run: flutter build ios --release --no-codesign
-      - name: Prepare & Upload Artifact
+
+      - name: Inject JSON Data
         run: |
-          cd build/ios/iphoneos
-          zip -r ../../flutter_player-ios.zip Runner.app
-      - name: Upload
+          echo "${{ github.event.inputs.project_json }}" | base64 --decode > lib/data.json
+          python3 -c "
+          import re
+          json_text = open('lib/data.json', 'r', encoding='utf-8').read()
+          with open('lib/main.dart', 'r', encoding='utf-8') as f:
+              content = f.read()
+          pattern = r\"const String rawJson = '''[\s\S]*?''';\"
+          replacement = f\"const String rawJson = '''\\n{json_text}\\n''';\"
+          new_content = re.sub(pattern, replacement, content)
+          with open('lib/main.dart', 'w', encoding='utf-8') as f:
+              f.write(new_content)
+          "
+
+      - name: Build iOS
+        run: |
+          flutter pub get
+          flutter build ios --release --no-codesign
+
+      - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: flutter_player-ios
-          path: flutter_player-ios.zip
+          name: flutter-app-ios-${{ github.event.inputs.build_id }}
+          path: build/ios/iphoneos/
+          retention-days: 7
 
-  # --- Create Release (仅在推送 Tag 时运行) ---
+  # --- 自动发布 Release (仅针对 Tag 推送) ---
   create-release:
-    # 只要有任何一个编译任务成功且是 Tag 触发，就尝试 Release
     if: always() && startsWith(github.ref, 'refs/tags/v')
     needs: [build-windows, build-android, build-ios]
     runs-on: ubuntu-latest
