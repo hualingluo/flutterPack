@@ -43,3 +43,43 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.gradle/
+/android/local.properties
+/android/gradle/
+/android/captures/
+/android/gradlew
+/android/gradlew.bat
+
+# iOS/Xcode related
+/ios/Pods/
+/ios/.symlinks/
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Flutter.podspec
+/ios/.generated/
+/ios/Runner.xcworkspace/
+/ios/Runner.xcodeproj/xcuserdata/
+/ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+/ios/Podfile.lock
+
+# Windows related
+/windows/.gradle/
+/windows/flutter/ephemeral/
+
+# Linux related
+/linux/.gradle/
+/linux/flutter/ephemeral/
+
+# macOS related
+/macos/.gradle/
+/macos/flutter/ephemeral/
+
+# Web related
+/web/.gradle/
+
+# Metadata
+.metadata
+.packages
+
+# Local configuration files
+.env
+.env.*
