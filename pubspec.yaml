@@ -1,0 +1,26 @@
+name: flutter_player
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Media kit for cross-platform video playback (supports Windows, Linux, macOS, Android, iOS, Web)
+  media_kit: ^1.1.10
+  media_kit_video: ^1.2.4
+  media_kit_libs_windows_video: ^1.0.9  # Windows support
+  media_kit_libs_android_video: ^1.0.4  # Android support
+  media_kit_libs_ios_video: ^1.0.4      # iOS support
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

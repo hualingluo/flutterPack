@@ -1,0 +1,165 @@
+name: Build Flutter App for All Platforms
+
+on:
+  push:
+    branches: [ master, main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  # Build Windows EXE
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.38.5'
+        channel: 'stable'
+        cache: true
+
+    - name: Flutter doctor
+      run: flutter doctor -v
+
+    - name: Install dependencies
+      run: flutter pub get
+
+    - name: Build Windows executable
+      run: flutter build windows --release
+
+    - name: Prepare Windows artifact
+      run: |
+        Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath flutter_player-windows.zip
+
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: flutter_player-windows
+        path: flutter_player-windows.zip
+        retention-days: 30
+
+  # Build Android APK
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.38.5'
+        channel: 'stable'
+        cache: true
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Flutter doctor
+      run: flutter doctor -v
+
+    - name: Install dependencies
+      run: flutter pub get
+
+    - name: Build Android APK
+      run: flutter build apk --release
+
+    - name: Upload Android APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: flutter_player-android
+        path: build/app/outputs/flutter-apk/app-release.apk
+        retention-days: 30
+
+    - name: Build Android App Bundle (optional)
+      run: flutter build appbundle --release
+
+    - name: Upload Android AAB artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: flutter_player-android-aab
+        path: build/app/outputs/bundle/release/app-release.aab
+        retention-days: 30
+
+  # Build iOS (requires macOS)
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.38.5'
+        channel: 'stable'
+        cache: true
+
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: Flutter doctor
+      run: flutter doctor -v
+
+    - name: Install dependencies
+      run: flutter pub get
+
+    - name: Build iOS (No codesign)
+      run: flutter build ios --release --no-codesign
+
+    - name: Prepare iOS artifact
+      run: |
+        cd build/ios/iphoneos
+        zip -r ../../flutter_player-ios.zip Runner.app
+
+    - name: Upload iOS artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: flutter_player-ios
+        path: flutter_player-ios.zip
+        retention-days: 30
+
+  # Create release on tag push
+  create-release:
+    needs: [build-windows, build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/flutter_player-android/*.apk
+          artifacts/flutter_player-android-aab/*.aab
+          artifacts/flutter_player-ios/*.zip
+          artifacts/flutter_player-windows/*.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
