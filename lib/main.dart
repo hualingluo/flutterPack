@@ -102,8 +102,16 @@ const String rawJson = '''
       "x": 100,
       "y": 300,
       "options": [
-        { "id": "o1", "label": "检查控制台", "targetId": "n2" },
-        { "id": "o2", "label": "强行打开舱门", "targetId": "n3" }
+        {
+          "id": "o1",
+          "label": "检查控制台",
+          "targetId": "n2"
+        },
+        {
+          "id": "o2",
+          "label": "强行打开舱门",
+          "targetId": "n3"
+        }
       ]
     },
     "n2": {
@@ -131,7 +139,12 @@ const String rawJson = '''
       "options": []
     }
   },
-  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+  "characters": {},
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "zoom": 1
+  }
 }
 ''';
 
